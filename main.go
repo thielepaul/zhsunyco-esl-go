@@ -15,8 +15,17 @@ const serviceUUIDStr = "00001523-1212-efde-1523-785feabcd123"
 const writeUUIDStr = "00001525-1212-efde-1523-785feabcd123"
 
 func main() {
-	imgBytesBw := image.Generate(10, 60, "Hello World!")
-	imgBytesRed := image.Generate(10, 120, "Hello World!")
+	weather := []image.Weather{
+		{High: 10, Low: 20, Icon: "cloudy", Text: "Hello World!"},
+		{High: 10, Low: 20, Icon: "snow", Text: "Hello World!"},
+		{High: 10, Low: 20, Icon: "thunderstorm", Text: "Hello World!"},
+	}
+
+	imgBytesBw, imgBytesRed, err := image.Generate(weather...)
+	if err != nil {
+		log.Fatalf("failed to generate image: %v", err)
+	}
+
 	packets, err := protocol.Marshal(imgBytesBw, imgBytesRed, "3D:00:00:7B:D5:F8")
 	if err != nil {
 		log.Fatalf("failed to marshal: %v", err)
@@ -78,7 +87,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to discover characteristics: %v", err)
 	}
-	for _, p := range packets {
+	for i, p := range packets {
+		log.Printf("write: %v/%v", i+1, len(packets))
 		_, err = chars[0].Write(p)
 		if err != nil {
 			log.Fatalf("failed to write: %v", err)
