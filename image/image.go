@@ -9,7 +9,7 @@ import (
 	"log"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
@@ -18,14 +18,17 @@ import (
 var weathericonsTTF []byte
 
 var weathericonsFont *opentype.Font
+var titleFont font.Face
 
 var colorRed = image.NewUniform(color.RGBA{R: 255, G: 0, B: 0, A: 255})
 
 type Weather struct {
-	High int
-	Icon string
-	Low  int
-	Text string
+	High                     int
+	Icon                     string
+	Low                      int
+	Day                      string
+	PrecipitationProbability int
+	PrecipitationAmount      float64
 }
 
 func init() {
@@ -34,6 +37,17 @@ func init() {
 	if err != nil {
 		log.Fatal("failed to parse weathericons font: " + err.Error())
 	}
+
+	f, err := opentype.Parse(gobold.TTF)
+	if err != nil {
+		log.Fatal("failed to parse go bold font: " + err.Error())
+	}
+
+	titleFont, err = opentype.NewFace(f, &opentype.FaceOptions{
+		Size:    20,
+		DPI:     72,
+		Hinting: font.HintingNone,
+	})
 }
 
 func drawText(img *image.RGBA, x, y int, text string, red bool) {
@@ -41,11 +55,14 @@ func drawText(img *image.RGBA, x, y int, text string, red bool) {
 	if red {
 		src = colorRed
 	}
+	m := titleFont.Metrics()
+	width := font.MeasureString(titleFont, text)
+	baseline := y + (m.Ascent-m.Descent).Round()/2
 	d := &font.Drawer{
 		Dst:  img,
 		Src:  src,
-		Face: basicfont.Face7x13,
-		Dot:  fixed.P(x, y),
+		Face: titleFont,
+		Dot:  fixed.P(x-width.Round()/2, baseline),
 	}
 	d.DrawString(text)
 }
@@ -77,14 +94,20 @@ func toBytes(img image.Image) ([]byte, []byte, error) {
 }
 
 func drawIcon(iconStr string, img *image.RGBA, x, y int, red bool) {
+	yOffset := 0
+	size := 48.0
 	var icon string
 	switch iconStr {
 	case "clear":
 		icon = "\uF00D"
+		yOffset = 3
 	case "partly-cloudy":
 		icon = "\uF002"
+		yOffset = 10
 	case "cloudy":
 		icon = "\uF013"
+		yOffset = 10
+		size = 56
 	case "fog":
 		icon = "\uF014"
 	case "wind":
@@ -108,18 +131,19 @@ func drawIcon(iconStr string, img *image.RGBA, x, y int, red bool) {
 		src = image.NewUniform(color.RGBA{R: 255, G: 0, B: 0, A: 255})
 	}
 	face, err := opentype.NewFace(weathericonsFont, &opentype.FaceOptions{
-		Size:    48,
+		Size:    size,
 		DPI:     72,
 		Hinting: font.HintingFull,
 	})
 	if err != nil {
 		panic("failed to create weathericons face: " + err.Error())
 	}
+	advance := font.MeasureString(face, icon)
 	d := &font.Drawer{
 		Dst:  img,
 		Src:  src,
 		Face: face,
-		Dot:  fixed.P(x, y),
+		Dot:  fixed.P(x+(99-advance.Round())/2, y+yOffset),
 	}
 	d.DrawString(icon) // cloud icon
 }
@@ -128,8 +152,15 @@ func Generate(weather ...Weather) ([]byte, []byte, error) {
 	img := image.NewRGBA(image.Rect(0, 0, 296, 128))
 	draw.Draw(img, img.Bounds(), image.White, image.Point{}, draw.Src)
 	for i, w := range weather {
-		drawIcon(w.Icon, img, (i * 99), 60, false)
-		drawText(img, (i * 99), 120, w.Text, true)
+		drawIcon(w.Icon, img, (i * 99), 70, false)
+		drawText(img, (i*99)+49, 16, w.Day, false)
+	}
+	// separators
+	for i := range len(weather) {
+		x := i*99 - 1
+		for y := 10; y < 118; y++ {
+			img.Set(x, y, colorRed)
+		}
 	}
 	return toBytes(img)
 }

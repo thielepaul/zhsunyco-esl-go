@@ -27,30 +27,30 @@ func toImg(bwBytes []byte, redBytes []byte) *image.RGBA {
 	return img
 }
 
-func TestGenerate(t *testing.T) {
+func TestGenerateVisual(t *testing.T) {
 	cases := []struct {
 		name string
 		data []Weather
 	}{
 		{"clear partly-cloudy cloudy", []Weather{
-			{High: 10, Low: 20, Icon: "clear", Text: "Hello World!"},
-			{High: 10, Low: 20, Icon: "partly-cloudy", Text: "Hello World!"},
-			{High: 10, Low: 20, Icon: "cloudy", Text: "Hello World!"},
+			{High: -2, Low: -8, PrecipitationProbability: 0, PrecipitationAmount: 0.0, Icon: "clear", Day: "Mo 31.5."},
+			{High: 3, Low: -4, PrecipitationProbability: 20, PrecipitationAmount: 0.5, Icon: "partly-cloudy", Day: "Di 1.6."},
+			{High: 1, Low: -6, PrecipitationProbability: 80, PrecipitationAmount: 4.2, Icon: "cloudy", Day: "Mi 22.12."},
 		}},
 		{"fog wind rain", []Weather{
-			{High: 10, Low: 20, Icon: "fog", Text: "Hello World!"},
-			{High: 10, Low: 20, Icon: "wind", Text: "Hello World!"},
-			{High: 10, Low: 20, Icon: "rain", Text: "Hello World!"},
+			{High: 12, Low: 1, PrecipitationProbability: 100, PrecipitationAmount: 12.8, Icon: "fog", Day: "Do 1.1."},
+			{High: 18, Low: 9, PrecipitationProbability: 40, PrecipitationAmount: 0.0, Icon: "wind", Day: "Fr 14.7."},
+			{High: 15, Low: 7, PrecipitationProbability: 90, PrecipitationAmount: 8.5, Icon: "rain", Day: "Sa 12.8."},
 		}},
 		{"sleet snow hail", []Weather{
-			{High: 10, Low: 20, Icon: "sleet", Text: "Hello World!"},
-			{High: 10, Low: 20, Icon: "snow", Text: "Hello World!"},
-			{High: 10, Low: 20, Icon: "hail", Text: "Hello World!"},
+			{High: 0, Low: -5, PrecipitationProbability: 70, PrecipitationAmount: 3.1, Icon: "sleet", Day: "So 13.8."},
+			{High: -1, Low: -12, PrecipitationProbability: 60, PrecipitationAmount: 6.4, Icon: "snow", Day: "Mo 22.12."},
+			{High: 5, Low: -1, PrecipitationProbability: 30, PrecipitationAmount: 1.2, Icon: "hail", Day: "Di 10.2."},
 		}},
 		{"thunderstorm null empty", []Weather{
-			{High: 10, Low: 20, Icon: "thunderstorm", Text: "Hello World!"},
-			{High: 10, Low: 20, Icon: "null", Text: "Hello World!"},
-			{High: 10, Low: 20, Icon: "", Text: "Hello World!"},
+			{High: 33, Low: 22, PrecipitationProbability: 95, PrecipitationAmount: 15.0, Icon: "thunderstorm", Day: "Mi 19.11."},
+			{High: 8, Low: 2, PrecipitationProbability: 0, PrecipitationAmount: 0.0, Icon: "null", Day: "Do 3.3."},
+			{High: 17, Low: 6, PrecipitationProbability: 10, PrecipitationAmount: 0.1, Icon: "", Day: "Fr 10.10."},
 		}},
 	}
 	for _, tt := range cases {
