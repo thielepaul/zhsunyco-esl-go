@@ -38,7 +38,7 @@ func TestGenerateVisual(t *testing.T) {
 			{High: 1, Low: -6, PrecipitationProbability: 80, PrecipitationAmount: 4.2, Icon: "cloudy", Day: "Mi 22.12."},
 		}},
 		{"fog wind rain", []Weather{
-			{High: 12, Low: 1, PrecipitationProbability: 100, PrecipitationAmount: 12.8, Icon: "fog", Day: "Do 1.1."},
+			{High: 12, Low: 1, PrecipitationProbability: 100, PrecipitationAmount: 5.5, Icon: "fog", Day: "Do 1.1."},
 			{High: 18, Low: 9, PrecipitationProbability: 40, PrecipitationAmount: 0.0, Icon: "wind", Day: "Fr 14.7."},
 			{High: 15, Low: 7, PrecipitationProbability: 90, PrecipitationAmount: 8.5, Icon: "rain", Day: "Sa 12.8."},
 		}},
@@ -48,7 +48,7 @@ func TestGenerateVisual(t *testing.T) {
 			{High: 5, Low: -1, PrecipitationProbability: 30, PrecipitationAmount: 1.2, Icon: "hail", Day: "Di 10.2."},
 		}},
 		{"thunderstorm null empty", []Weather{
-			{High: 33, Low: 22, PrecipitationProbability: 95, PrecipitationAmount: 15.0, Icon: "thunderstorm", Day: "Mi 19.11."},
+			{High: 33, Low: 22, PrecipitationProbability: 95, PrecipitationAmount: 15.5, Icon: "thunderstorm", Day: "Mi 19.11."},
 			{High: 8, Low: 2, PrecipitationProbability: 0, PrecipitationAmount: 0.0, Icon: "null", Day: "Do 3.3."},
 			{High: 17, Low: 6, PrecipitationProbability: 10, PrecipitationAmount: 0.1, Icon: "", Day: "Fr 10.10."},
 		}},

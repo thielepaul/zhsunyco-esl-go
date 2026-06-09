@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
@@ -19,6 +20,7 @@ var weathericonsTTF []byte
 
 var weathericonsFont *opentype.Font
 var titleFont font.Face
+var infoFont font.Face
 
 var colorRed = image.NewUniform(color.RGBA{R: 255, G: 0, B: 0, A: 255})
 
@@ -38,30 +40,40 @@ func init() {
 		log.Fatal("failed to parse weathericons font: " + err.Error())
 	}
 
-	f, err := opentype.Parse(gobold.TTF)
+	goBoldFont, err := opentype.Parse(gobold.TTF)
 	if err != nil {
 		log.Fatal("failed to parse go bold font: " + err.Error())
 	}
 
-	titleFont, err = opentype.NewFace(f, &opentype.FaceOptions{
+	goRegularFont, err := opentype.Parse(goregular.TTF)
+	if err != nil {
+		log.Fatal("failed to parse go regular font: " + err.Error())
+	}
+
+	titleFont, err = opentype.NewFace(goBoldFont, &opentype.FaceOptions{
 		Size:    20,
 		DPI:     72,
-		Hinting: font.HintingNone,
+		Hinting: font.HintingFull,
+	})
+	infoFont, err = opentype.NewFace(goRegularFont, &opentype.FaceOptions{
+		Size:    16,
+		DPI:     72,
+		Hinting: font.HintingFull,
 	})
 }
 
-func drawText(img *image.RGBA, x, y int, text string, red bool) {
+func drawText(img *image.RGBA, x, y int, text string, face font.Face, red bool) {
 	src := image.Black
 	if red {
 		src = colorRed
 	}
-	m := titleFont.Metrics()
-	width := font.MeasureString(titleFont, text)
+	m := face.Metrics()
+	width := font.MeasureString(face, text)
 	baseline := y + (m.Ascent-m.Descent).Round()/2
 	d := &font.Drawer{
 		Dst:  img,
 		Src:  src,
-		Face: titleFont,
+		Face: face,
 		Dot:  fixed.P(x-width.Round()/2, baseline),
 	}
 	d.DrawString(text)
@@ -82,7 +94,7 @@ func toBytes(img image.Image) ([]byte, []byte, error) {
 					black[pos] = 1
 				}
 			case r > g && r > b:
-				if r/3+g/3+b/3 < 0x8000 { // red pixel = set byte to 1
+				if (uint32(g)+uint32(b))/2 < 0x8000 { // red pixel = set byte to 1
 					red[pos] = 1
 				}
 			default:
@@ -152,8 +164,12 @@ func Generate(weather ...Weather) ([]byte, []byte, error) {
 	img := image.NewRGBA(image.Rect(0, 0, 296, 128))
 	draw.Draw(img, img.Bounds(), image.White, image.Point{}, draw.Src)
 	for i, w := range weather {
+		drawText(img, (i*99)+49, 16, w.Day, titleFont, false)
 		drawIcon(w.Icon, img, (i * 99), 70, false)
-		drawText(img, (i*99)+49, 16, w.Day, false)
+		drawText(img, (i*99)+24, 95, fmt.Sprintf("%d°C", w.Low), infoFont, isHot(w.Low))
+		drawText(img, (i*99)+74, 95, fmt.Sprintf("%d°C", w.High), infoFont, isHot(w.High))
+		drawText(img, (i*99)+28, 115, fmtRain(w.PrecipitationAmount), infoFont, false)
+		drawText(img, (i*99)+74, 115, fmt.Sprintf("%d%%", w.PrecipitationProbability), infoFont, false)
 	}
 	// separators
 	for i := range len(weather) {
@@ -163,4 +179,15 @@ func Generate(weather ...Weather) ([]byte, []byte, error) {
 		}
 	}
 	return toBytes(img)
+}
+
+func fmtRain(p float64) string {
+	if p < 10.0 {
+		return fmt.Sprintf("%.1fmm", p)
+	}
+	return fmt.Sprintf("%.0fmm", p)
+}
+
+func isHot(temp int) bool {
+	return temp >= 20
 }

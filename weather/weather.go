@@ -1,8 +1,12 @@
 package weather
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"math"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -10,51 +14,111 @@ const apiBase = "https://api.brightsky.dev/weather"
 
 type Forecast struct {
 	Icon                     string
-	Day                      string
 	High                     int
 	Low                      int
 	PrecipitationAmount      float64
 	PrecipitationProbability int
 }
 
-// ❯ curl -s 'https://api.brightsky.dev/weather?date=2026-06-07&lat=48.171&lon=11.564' --header 'Accept: application/json' | jq
-// {
-//   "weather": [
-//     {
-//       "timestamp": "2026-06-07T00:00:00+00:00",
-//       "source_id": 46586,
-//       "precipitation": 0.0,
-//       "pressure_msl": 1019.1,
-//       "sunshine": 0.0,
-//       "temperature": 18.1,
-//       "wind_direction": 240,
-//       "wind_speed": 7.9,
-//       "cloud_cover": 100,
-//       "dew_point": 10.8,
-//       "relative_humidity": 62,
-//       "visibility": 66140,
-//       "wind_gust_direction": 230,
-//       "wind_gust_speed": 16.2,
-//       "condition": "dry",
-//       "precipitation_probability": null,
-//       "precipitation_probability_6h": null,
-//       "solar": 0.0,
-//       "fallback_source_ids": {
-//         "solar": 46598
-//       },
-//       "icon": "cloudy"
-//     },
+// internal types for JSON decoding
+type weatherEntry struct {
+	Timestamp                  string  `json:"timestamp"`
+	Temperature                float64 `json:"temperature"`
+	Precipitation              float64 `json:"precipitation"`
+	PrecipitationProbability6h int     `json:"precipitation_probability_6h"`
+	Icon                       string  `json:"icon"`
+}
+
+type weatherResponse struct {
+	Weather []weatherEntry `json:"weather"`
+}
 
 func GetForecast(lat, lon string, date time.Time) (Forecast, error) {
-	data, err := http.Get(fmt.Sprintf("%s?date=%s&lat=%s&lon=%s", apiBase, date.Format("2006-01-02"), lat, lon))
+	targetDate := date.UTC().Format("2006-01-02")
+	resp, err := http.Get(fmt.Sprintf("%s?date=%s&lat=%s&lon=%s",
+		apiBase, targetDate, lat, lon))
 	if err != nil {
 		return Forecast{}, err
 	}
-	defer data.Body.Close()
-	if data.StatusCode != 200 {
-		return Forecast{}, fmt.Errorf("failed to get forecast: %d", data.StatusCode)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return Forecast{}, fmt.Errorf("failed to get forecast: %d", resp.StatusCode)
 	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Forecast{}, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	return parseForecast(body, targetDate)
+}
+
+func parseForecast(body []byte, targetDate string) (Forecast, error) {
+	var wr weatherResponse
+	if err := json.Unmarshal(body, &wr); err != nil {
+		return Forecast{}, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if len(wr.Weather) == 0 {
+		return Forecast{}, fmt.Errorf("no weather data for %s", targetDate)
+	}
+
+	high := math.Inf(-1)
+	low := math.Inf(1)
+	var totalPrecip float64
+	maxPrecipProb := 0
+	iconCounts := make(map[string]int)
+
+	for _, entry := range wr.Weather {
+		t, err := time.Parse(time.RFC3339, entry.Timestamp)
+		if err != nil {
+			continue
+		}
+		// Skip entries that don't belong to the requested date (API can return
+		// a trailing midnight entry for the following day)
+		if t.UTC().Format("2006-01-02") != targetDate {
+			continue
+		}
+
+		if entry.Temperature > high {
+			high = entry.Temperature
+		}
+		if entry.Temperature < low {
+			low = entry.Temperature
+		}
+		totalPrecip += entry.Precipitation
+		if entry.PrecipitationProbability6h > maxPrecipProb {
+			maxPrecipProb = entry.PrecipitationProbability6h
+		}
+		// Count icons only during daylight hours (06:00–19:59 UTC) so that
+		// night icons don't dominate the representative daily icon.
+		if h := t.UTC().Hour(); h >= 6 && h < 20 {
+			iconCounts[entry.Icon]++
+		}
+	}
+
+	if math.IsInf(high, -1) {
+		return Forecast{}, fmt.Errorf("no entries found for %s", targetDate)
+	}
+
+	// Most frequently occurring daytime icon wins.
+	bestIcon, bestCount := "", 0
+	for icon, count := range iconCounts {
+		if count > bestCount {
+			bestCount = count
+			bestIcon = icon
+		}
+	}
+
+	bestIcon = strings.TrimSuffix(bestIcon, "-day")
+	bestIcon = strings.TrimSuffix(bestIcon, "-night")
+
 	return Forecast{
-		Icon: "clear",
+		Icon:                     bestIcon,
+		High:                     int(math.Round(high)),
+		Low:                      int(math.Round(low)),
+		PrecipitationAmount:      math.Round(totalPrecip*10) / 10,
+		PrecipitationProbability: maxPrecipProb,
 	}, nil
 }

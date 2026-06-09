@@ -27,20 +27,33 @@ func init() {
 		log.Fatalf("failed to parse UUID: %v", err)
 	}
 }
-func Update(macStr string, packets [][]byte) error {
+
+type ESLDevice struct {
+	adapter *bluetooth.Adapter
+	mac     bluetooth.MAC
+}
+
+func NewESLDevice(macStr string) (*ESLDevice, error) {
 	if err := adapter.Enable(); err != nil {
-		return fmt.Errorf("failed to enable BLE stack: %v", err)
+		return nil, fmt.Errorf("failed to enable BLE stack: %v", err)
 	}
 
 	mac, err := bluetooth.ParseMAC(macStr)
 	if err != nil {
-		return fmt.Errorf("failed to parse MAC address: %v", err)
+		return nil, fmt.Errorf("failed to parse MAC address: %v", err)
 	}
 
+	return &ESLDevice{
+		adapter: adapter,
+		mac:     mac,
+	}, nil
+}
+
+func (d *ESLDevice) Update(packets [][]byte) error {
 	log.Println("starting scan")
 	var foundDevice bluetooth.ScanResult
-	err = adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
-		if !isThisTheDevice(device, mac) {
+	err := d.adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
+		if !isThisTheDevice(device, d.mac) {
 			return
 		}
 		foundDevice = device
@@ -52,6 +65,9 @@ func Update(macStr string, packets [][]byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to scan: %v", err)
 	}
+
+	// Give the adapter a short time to transition from scanning to connecting
+	time.Sleep(500 * time.Millisecond)
 
 	log.Println("connecting")
 	conn, err := adapter.Connect(foundDevice.Address, bluetooth.ConnectionParams{
