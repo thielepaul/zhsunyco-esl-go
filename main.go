@@ -1,8 +1,8 @@
 package main
 
 import (
+	"flag"
 	"log"
-	"os"
 	"time"
 	_ "time/tzdata"
 
@@ -12,12 +12,18 @@ import (
 	"github.com/thielepaul/zhsunyco-esl-go/weather"
 )
 
-func main() {
-	macStr := getEnv("MAC")
-	lat := getEnv("LAT")
-	lon := getEnv("LON")
+var macStr = flag.String("mac", "", "MAC address of the ESL device")
+var lat = flag.String("lat", "", "Latitude of the location")
+var lon = flag.String("lon", "", "Longitude of the location")
+var once = flag.Bool("once", false, "Run once")
 
-	device, err := connect.NewESLDevice(macStr)
+func main() {
+	flag.Parse()
+	if *macStr == "" || *lat == "" || *lon == "" {
+		log.Fatalf("Please provide MAC, Latitude and Longitude. Use -mac, -lat and -lon flags")
+	}
+
+	device, err := connect.NewESLDevice(*macStr)
 	if err != nil {
 		log.Fatalf("failed to create ESL device: %v", err)
 	}
@@ -34,13 +40,15 @@ func main() {
 			nextRun = nextRun.AddDate(0, 0, 1)
 		}
 		durationUntilNextRun := time.Until(nextRun)
-		log.Printf("Next run scheduled for: %v (Sleeping for %v)\n", nextRun.Format(time.RFC1123), durationUntilNextRun)
-		time.Sleep(durationUntilNextRun)
+		if !*once {
+			log.Printf("Next run scheduled for: %v (Sleeping for %v)\n", nextRun.Format(time.RFC1123), durationUntilNextRun)
+			time.Sleep(durationUntilNextRun)
+		}
 
 		weatherDays := []image.Weather{}
 		for i := range 3 {
 			date := time.Now().AddDate(0, 0, i)
-			forecast, err := weather.GetForecast(lat, lon, date)
+			forecast, err := weather.GetForecast(*lat, *lon, date)
 			if err != nil {
 				log.Fatalf("failed to get forecast: %v", err)
 			}
@@ -57,7 +65,7 @@ func main() {
 			log.Fatalf("failed to generate image: %v", err)
 		}
 
-		packets, err := protocol.Marshal(imgBytesBw, imgBytesRed, macStr)
+		packets, err := protocol.Marshal(imgBytesBw, imgBytesRed, *macStr)
 		if err != nil {
 			log.Fatalf("failed to marshal: %v", err)
 		}
@@ -70,18 +78,14 @@ func main() {
 			}
 			break
 		}
+
+		if *once {
+			break
+		}
 	}
 }
 
 func formatDayGerman(date time.Time) string {
 	weekdays := []string{"So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"}
 	return weekdays[date.Weekday()] + " " + date.Format("2.1.")
-}
-
-func getEnv(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("environment variable %s is not set", key)
-	}
-	return value
 }

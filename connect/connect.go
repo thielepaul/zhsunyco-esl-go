@@ -8,11 +8,10 @@ import (
 	"tinygo.org/x/bluetooth"
 )
 
-var adapter = bluetooth.DefaultAdapter
-
 const serviceUUIDStr = "00001523-1212-efde-1523-785feabcd123"
 const writeUUIDStr = "00001525-1212-efde-1523-785feabcd123"
 
+var adapter = bluetooth.DefaultAdapter
 var serviceUUID bluetooth.UUID
 var writeUUID bluetooth.UUID
 
@@ -29,14 +28,10 @@ func init() {
 }
 
 type ESLDevice struct {
-	adapter *bluetooth.Adapter
-	mac     bluetooth.MAC
+	mac bluetooth.MAC
 }
 
 func NewESLDevice(macStr string) (*ESLDevice, error) {
-	if err := adapter.Enable(); err != nil {
-		return nil, fmt.Errorf("failed to enable BLE stack: %v", err)
-	}
 
 	mac, err := bluetooth.ParseMAC(macStr)
 	if err != nil {
@@ -44,15 +39,17 @@ func NewESLDevice(macStr string) (*ESLDevice, error) {
 	}
 
 	return &ESLDevice{
-		adapter: adapter,
-		mac:     mac,
+		mac: mac,
 	}, nil
 }
 
 func (d *ESLDevice) Update(packets [][]byte) error {
+	if err := adapter.Enable(); err != nil {
+		return fmt.Errorf("failed to enable BLE stack: %v", err)
+	}
 	log.Println("starting scan")
 	var foundDevice bluetooth.ScanResult
-	err := d.adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
+	err := adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
 		if !isThisTheDevice(device, d.mac) {
 			return
 		}
