@@ -194,15 +194,38 @@ func TestFontsRenderWithoutAntiAliasing(t *testing.T) {
 	for _, f := range faces {
 		for _, s := range f.strings {
 			for _, red := range []bool{false, true} {
-				img := image.NewRGBA(image.Rect(0, 0, 400, 80))
+				// Size the canvas to the string instead of using a fixed one:
+				// this test is the suite's hot spot, and a canvas that is merely
+				// big enough scans several times fewer pixels. drawText centres
+				// on x, so x = width/2 + 2 puts the pen at 2 and leaves room for
+				// the 1 px side bearing without clipping either edge.
+				width := font.MeasureString(f.face, s).Round()
+				const height = 48 // fits 15 px of ink at either font's size
+				img := image.NewRGBA(image.Rect(0, 0, width+4, height))
 				draw.Draw(img, img.Bounds(), image.White, image.Point{}, draw.Src)
-				drawText(img, 200, 40, s, f.face, red)
-				bounds := img.Bounds()
-				for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-					for x := bounds.Min.X; x < bounds.Max.X; x++ {
-						c := img.RGBAAt(x, y)
-						if !allowed[c] {
-							t.Fatalf("%s font drew %q with anti-aliased pixel %v at (%d,%d)", f.name, s, c, x, y)
+				drawText(img, width/2+2, height/2, s, f.face, red)
+
+				// Only the bounding box of the non-white pixels can hold a
+				// blend, and pure white is allowed, so scanning that box is
+				// equivalent to scanning the canvas.
+				minX, minY, maxX, maxY, inked := width, height, 0, 0, false
+				for y := range height {
+					for x := range width + 4 {
+						if img.RGBAAt(x, y) != (color.RGBA{255, 255, 255, 255}) {
+							inked = true
+							minX, maxX = min(minX, x), max(maxX, x)
+							minY, maxY = min(minY, y), max(maxY, y)
+						}
+					}
+				}
+				if !inked {
+					continue // nothing drawn, so nothing to be blurry
+				}
+				for y := minY; y <= maxY; y++ {
+					for x := minX; x <= maxX; x++ {
+						if c := img.RGBAAt(x, y); !allowed[c] {
+							t.Fatalf("%s font drew %q with anti-aliased pixel %v at (%d,%d)",
+								f.name, s, c, x, y)
 						}
 					}
 				}
