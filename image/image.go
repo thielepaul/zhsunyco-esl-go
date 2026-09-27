@@ -9,14 +9,33 @@ import (
 	"log"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
 
 //go:embed fonts/weathericons-regular-webfont.ttf
 var weathericonsTTF []byte
+
+// The display is 1-bit (black/red/white), so anti-aliased vector fonts turn
+// into ragged edges after thresholding. Both fonts below are pixel fonts whose
+// outlines land exactly on the pixel grid at their rendered size (27 px and
+// 20 px at 72 dpi), so they rasterize with no anti-aliasing and no upscaling -
+// see TestFontGlyphCoverage and TestFontsRenderWithoutAntiAliasing.
+//
+// Title: Jersey 15 (OFL 1.1), whose native design size is 27 px. At no other
+// size do its outlines align with the pixel grid.
+//
+//go:embed fonts/jersey15-title-subset.ttf
+var titleTTF []byte
+
+// Info: ESL Pixel Info (OFL 1.1), a custom pixel font generated for this
+// project, 100 font units per design pixel. It carries only the glyphs the
+// layout draws - space, %, -, ., 0-9, C, m and ° - with 15 px tall digits on
+// 2 px strokes, a half-height "mm" unit and a 2x2 period. Native design size
+// 20 px.
+//
+//go:embed fonts/esl-pixel-info.ttf
+var infoTTF []byte
 
 var weathericonsFont *opentype.Font
 var titleFont font.Face
@@ -40,26 +59,32 @@ func init() {
 		log.Fatal("failed to parse weathericons font: " + err.Error())
 	}
 
-	goBoldFont, err := opentype.Parse(gobold.TTF)
+	titleFontData, err := opentype.Parse(titleTTF)
 	if err != nil {
-		log.Fatal("failed to parse go bold font: " + err.Error())
+		log.Fatal("failed to parse title font: " + err.Error())
 	}
 
-	goRegularFont, err := opentype.Parse(goregular.TTF)
+	infoFontData, err := opentype.Parse(infoTTF)
 	if err != nil {
-		log.Fatal("failed to parse go regular font: " + err.Error())
+		log.Fatal("failed to parse info font: " + err.Error())
 	}
 
-	titleFont, err = opentype.NewFace(goBoldFont, &opentype.FaceOptions{
+	titleFont, err = opentype.NewFace(titleFontData, &opentype.FaceOptions{
+		Size:    27,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		log.Fatal("failed to create title face: " + err.Error())
+	}
+	infoFont, err = opentype.NewFace(infoFontData, &opentype.FaceOptions{
 		Size:    20,
 		DPI:     72,
 		Hinting: font.HintingFull,
 	})
-	infoFont, err = opentype.NewFace(goRegularFont, &opentype.FaceOptions{
-		Size:    16,
-		DPI:     72,
-		Hinting: font.HintingFull,
-	})
+	if err != nil {
+		log.Fatal("failed to create info face: " + err.Error())
+	}
 }
 
 func drawText(img *image.RGBA, x, y int, text string, face font.Face, red bool) {
@@ -166,15 +191,16 @@ func Generate(weather ...Weather) ([]byte, []byte, error) {
 	for i, w := range weather {
 		drawText(img, (i*99)+49, 16, w.Day, titleFont, false)
 		drawIcon(w.Icon, img, (i * 99), 70, false)
-		drawText(img, (i*99)+24, 95, fmt.Sprintf("%d°C", w.Low), infoFont, isHot(w.Low))
-		drawText(img, (i*99)+74, 95, fmt.Sprintf("%d°C", w.High), infoFont, isHot(w.High))
-		drawText(img, (i*99)+28, 115, fmtRain(w.PrecipitationAmount), infoFont, false)
-		drawText(img, (i*99)+74, 115, fmt.Sprintf("%d%%", w.PrecipitationProbability), infoFont, false)
+		drawText(img, (i*99)+24, 98, fmt.Sprintf("%d°C", w.Low), infoFont, isHot(w.Low))
+		drawText(img, (i*99)+74, 98, fmt.Sprintf("%d°C", w.High), infoFont, isHot(w.High))
+		drawText(img, (i*99)+26, 118, fmtRain(w.PrecipitationAmount), infoFont, false)
+		drawText(img, (i*99)+74, 118, fmt.Sprintf("%d%%", w.PrecipitationProbability), infoFont, false)
 	}
-	// separators
+	// separators, running from the title down to the last row of the info
+	// text so they end flush with it
 	for i := range len(weather) {
 		x := i*99 - 1
-		for y := 10; y < 118; y++ {
+		for y := 10; y < 124; y++ {
 			img.Set(x, y, colorRed)
 		}
 	}
