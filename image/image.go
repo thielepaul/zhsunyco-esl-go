@@ -29,10 +29,10 @@ var weathericonsTTF []byte
 var titleTTF []byte
 
 // Info: ESL Pixel Info (OFL 1.1), a custom pixel font generated for this
-// project, 100 font units per design pixel. It carries only the glyphs the
-// layout draws - space, %, -, ., 0-9, C, m and ° - with 15 px tall digits on
-// 2 px strokes, a half-height "mm" unit and a 2x2 period. Native design size
-// 20 px.
+// project, 100 font units per design pixel. It carries the glyphs the layout
+// draws - %, -, ., 0-9, C, m and ° - plus a space no format string currently
+// emits, with 15 px tall digits on 2 px strokes, a half-height "mm" unit and a
+// 2x2 period. Native design size 20 px.
 //
 //go:embed fonts/esl-pixel-info.ttf
 var infoTTF []byte
